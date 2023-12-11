@@ -1,0 +1,22 @@
+{
+  "name": "HealthCheck",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "main": "src/functions/*.js",
+  "scripts": {
+    "start": "func start",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Akshay Sadavarte",
+  "license": "ISC",
+  "dependencies": {
+    "@azure/functions": "^4.0.0",
+    "is-url-http": "^2.3.7",
+    "lighthouse": "^11.3.0",
+    "mssql": "^10.0.1",
+    "puppeteer": "^21.5.2",
+    "sequelize": "^6.35.1",
+    "tedious": "^16.6.1"
+  }
+}
