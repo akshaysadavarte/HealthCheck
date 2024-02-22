@@ -2,7 +2,7 @@ import { app } from '@azure/functions';
 import main from '../index.js'
 
 app.timer('HealthCheck', {
-    schedule: '0 */45 * * * *',
+    schedule: '0 */30 * * * *',
     handler: async (myTimer, context) => {
         context.log('Timer function processed request at', new Date().toISOString());
         context.log('Timer status:', myTimer);

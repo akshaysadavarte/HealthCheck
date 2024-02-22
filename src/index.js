@@ -1,44 +1,15 @@
 import puppeteer from 'puppeteer'
 import lighthouse from 'lighthouse'
-import { loginByUsernamePassword, loginByAzureAD } from './utils/auth.js'
+import isUrlHttp from 'is-url-http'
+import { loginByAzureAD } from './utils/auth.js'
 import { getSmallDatetime, httpStatusNameByStatusCode } from './utils/date_utils.js'
 import { calculateAverageLoadTime } from './utils/math_utils.js'
-import { getAllScreenResponseCheckTarget, createScreenResponseTime } from './services/database_service.js'
-import isUrlHttp from 'is-url-http'
+import { getAllScreenResponseCheckTarget, bulkCreateScreenResponseTime } from './services/database_service.js'
+import { puppeteerConfig, lighthouseConfig } from './config/browser_config.js'
 
-
-
-const PORT = process.env.BROWSER_PORT;
-
-const options = {
-  port: PORT,
-  disableStorageReset: true,
-  //output: 'html',
-  //onlyCategories: ['performance'],
-}
-
-const config = {
-  extends: 'lighthouse:default',
-  settings: {
-    formFactor: 'desktop',
-    screenEmulation: {
-      mobile: false,
-      width: 1350,
-      height: 940,
-      deviceScaleFactor: 1,
-      disabled: false
-    },
-    emulatedUserAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/ 537.36(KHTML, like Gecko) Chrome/ 84.0.4143.7 Safari / 537.36 Chrome - Lighthouse',
-    onlyAudits: [
-      'network-requests',
-      'interactive',
-    ],
-  }
-}
 
 let logger;
-
-const main = async function (context) {
+export default async function main(context) {
   logger = context;
   logger.log('Started!!')
   const screens = await getAllScreenResponseCheckTarget(logger);
@@ -46,38 +17,28 @@ const main = async function (context) {
   let browser;
   try {
 
-    browser = await puppeteer.launch({
-      defaultViewport: null,
-      ignoreDefaultArgs: ['--enable-automation'],
-      args: [`--remote-debugging-port=${PORT}`, '--start-maximized', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage'],
-      protocolTimeout: 2400000,
-      headless: true,
-      slowMo: 50,
-    });
+    browser = await puppeteer.launch(puppeteerConfig);
 
-    const isAuthenticated = await loginByAzureAD(browser, loginUrl, logger);
+    const page = await browser.newPage();
+    await loginByAzureAD(page, loginUrl);
 
-    if (isAuthenticated) {
-      const records = [];
-      for (const screen of screens) {
+    const records = [];
+    for (const screen of screens) {
 
-        const url = screen.ScreeenURL.trim();
+      const url = screen.ScreeenURL.trim();
 
-        if (!isUrlHttp(url)) { continue; }
+      if (!isUrlHttp(url)) { continue; }
 
-        const record = await audit(screen, url);
+      const record = await audit(screen, url, page);
 
-        if (record) {
-          records.push(record);
-        }
-      }
-      if (records.length) {
-        await createScreenResponseTime(records, logger);
-      }
-
-      logger.log('Done !!')
-
+      if (record) { records.push(record); }
     }
+
+    if (records.length) {
+      await bulkCreateScreenResponseTime(records, logger);
+    }
+    logger.log(`Job Completed !!!`);
+
   } catch (error) {
     logger.error(`Error occurred in main():-${error}`);
   } finally {
@@ -85,65 +46,57 @@ const main = async function (context) {
   }
 }
 
-async function audit(screen, url) {
+async function audit(screen, url, page) {
 
   const numberOfTrial = screen.NumberOfTrial;
   let statusCode;
   let avgLoadTimeArr = [];
-  let retryCount = 0;
-  let results;
-  try {
+  let retryCount = 3;
 
-    for (let i = 0; i < numberOfTrial; i++) {
+  for (let i = 0; i < numberOfTrial; i++) {
+    try {
+      if (!retryCount) { return null };
 
-      results = await lighthouse(url, options, config);
+      const results = await lighthouse(url, lighthouseConfig.options, lighthouseConfig.config, page);
 
       const audits = results.lhr.audits;
 
       const networkrequests = audits['network-requests'];
-      const firstRequest = networkrequests.details?.items[0];
-      statusCode = firstRequest?.statusCode;
+      const firstRequest = networkrequests.details.items[0];
+      statusCode = firstRequest.statusCode;
+      const numericValue = audits['interactive'].numericValue;
 
-      const numericValue = audits['interactive']?.numericValue;
-
-      if (!(statusCode && numericValue) && retryCount < 3) {
-        //logger.log(`Failed audit for ${url} i = ${i} statusCode:- ${statusCode} | numericValue:- ${numericValue}`);
-        i--;
-        retryCount++;
-        logger.error(`${retryCount} of 3 Retrying audit for ${url}\n`);
-
-      } else {
-        retryCount = 0;
-        avgLoadTimeArr.push(numericValue);
-      }
-
+      avgLoadTimeArr.push(numericValue);
+      retryCount = 3;
     }
-
-    const avgLoadTimeInSeconds = calculateAverageLoadTime(avgLoadTimeArr);
-    const now = getSmallDatetime(new Date());
-
-    const record = {
-      TrialDatetime: now,
-      TrialNumber: screen.NumberOfTrial,
-      ScreeenName: screen.ScreeenName,
-      ScreeenURL: screen.ScreeenURL,
-      LoadingTimeSeconds: avgLoadTimeInSeconds,
-      HttpStatusCode: statusCode,
-      HttpStatusName: httpStatusNameByStatusCode(statusCode),
-      NumberOfParallelProcessing: screen.NumberOfParallelProcessing,
-      CreatedOn: now,
-      CreatedBy: screen.CreatedBy,
-      ModifiedOn: now,
-      ModifiedBy: screen.ModifiedBy
-    };
-    logger.log(`${record.TrialDatetime} |${record.HttpStatusCode}| ${record.HttpStatusName} | ${record.ScreeenName} | ${record.ScreeenURL} | LoadTimeInSeconds:- ${record.LoadingTimeSeconds} s`)
-    return record;
-
-  } catch (error) {
-    logger.error(`Error occurred in audit():-${error}`);
-    return null;
+    catch (error) {
+      logger.error(`Error occurred in lighthouse(${url}):-${error}`);
+      logger.error(`${4 - retryCount} of 3 Retrying audit for ${url}`);
+      i--;
+      retryCount--;
+    }
   }
+
+  const avgLoadTimeInSeconds = calculateAverageLoadTime(avgLoadTimeArr);
+  const now = getSmallDatetime(new Date());
+
+  const record = {
+    TrialDatetime: now,
+    TrialNumber: screen.NumberOfTrial,
+    ScreeenName: screen.ScreeenName,
+    ScreeenURL: screen.ScreeenURL,
+    LoadingTimeSeconds: avgLoadTimeInSeconds,
+    HttpStatusCode: statusCode,
+    HttpStatusName: httpStatusNameByStatusCode(statusCode),
+    NumberOfParallelProcessing: screen.NumberOfParallelProcessing,
+    CreatedOn: now,
+    CreatedBy: screen.CreatedBy,
+    ModifiedOn: now,
+    ModifiedBy: screen.ModifiedBy
+  };
+  logger.log(`${record.TrialDatetime} |${record.HttpStatusCode}| ${record.HttpStatusName} | ${record.ScreeenName} | ${record.ScreeenURL} | LoadTimeInSeconds:- ${record.LoadingTimeSeconds} s`)
+  return record;
 }
 
 
-export default main
+

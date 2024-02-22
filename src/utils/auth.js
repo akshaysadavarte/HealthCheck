@@ -1,63 +1,74 @@
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 
-const CARGOTRACK_USER = process.env.CARGOTRACK_USERNAME;
-const CARGOTRACK_PWD = process.env.CARGOTRACK_PASSWORD;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const filePath = path.join(__dirname, "cookie.json");
 
 const MS_USER = process.env.MS_USERNAME;
 const MS_PWD = process.env.MS_PASSWORD;
 
-export const loginByUsernamePassword = async function (browser, origin,context) {
+export const loginByAzureAD = async function (page, origin) {
+  await loadCookiesFromFile(page);
+
+  await page.setDefaultNavigationTimeout(0);
+  await page.goto(origin);
+  await page.waitForSelector("button", { visible: true });
+  const azureADButton = await page.$("#AzureAD");
+
+  if (!azureADButton) return;
+
+  await page.click("#AzureAD");
+  await page.waitForNavigation();
+
+  //MS LOGIN
+  await page.waitForSelector('[name="loginfmt"]');
+  await page.type('[name="loginfmt"]', MS_USER);
+  await page.click('[type="submit"]');
+
+  await page.waitForNavigation();
+  await page.waitForSelector('input[type="password"]', { visible: true });
+  await page.type('input[type="password"]', MS_PWD);
+  await page.click('[type="submit"]');
+  await page.waitForNavigation();
+  await page.click('[type="submit"]');
+  await page.waitForNavigation();
+  await saveCookiesToFile(page);
+};
+
+async function saveCookiesToFile(page) {
   try {
+    // Getting the cookies from the current page
+    const cookies = await page.cookies();
 
-    const page = await browser.newPage();
+    // Writing the cookies to a file as JSON
 
-    await page.setDefaultNavigationTimeout(0);
-    await page.goto(origin);
-    await page.waitForSelector('input[type="email"]', { visible: true });
-    const emailInput = await page.$('input[type="email"]');
-    await emailInput.type(CARGOTRACK_USER);
+    fs.writeFileSync(filePath, JSON.stringify(cookies, null, 2));
 
-    const passwordInput = await page.$('input[type="password"]');
-    await passwordInput.type(CARGOTRACK_PWD);
-
-    await page.click('#next');
-    await page.waitForNavigation();
+    // Cookies have been saved successfully
     return true;
-
   } catch (error) {
-    await browser.close();
-    context.error(`Error occurred in loginByUsernamePassword():-${error}`);
+    // An error occurred while saving cookies
+    console.error("Error saving cookies:", error);
     return false;
   }
 }
 
-export const loginByAzureAD = async function (browser, origin,context) {
+async function loadCookiesFromFile(page) {
   try {
+    // Reading cookies from the specified file
+    const cookiesJson = fs.readFileSync(filePath, "utf-8");
+    const cookies = JSON.parse(cookiesJson);
 
-    const page = await browser.newPage();
-    await page.setDefaultNavigationTimeout(0);
-    await page.goto(origin);
-    await page.waitForSelector('button', { visible: true });
-    await page.click('#AzureAD');
-    await page.waitForNavigation();
-
-
-    await page.waitForSelector('[name="loginfmt"]')
-    await page.type('[name="loginfmt"]', MS_USER)
-    await page.click('[type="submit"]')
-
-    await page.waitForNavigation();
-    await page.waitForSelector('input[type="password"]', { visible: true })
-    await page.type('input[type="password"]', MS_PWD)
-    await page.click('[type="submit"]')
-    await page.waitForNavigation();
-    await page.click('[type="submit"]')
-
-    await page.waitForNavigation();
+    // Setting the cookies in the current page
+    await page.setCookie(...cookies);
+    // Cookies have been loaded successfully
     return true;
   } catch (error) {
-    await browser.close();
-    context.error(`Error occurred in loginByAzureAD():-${error}`);
+    // An error occurred while loading cookies
+    console.error("Error loading cookies:", error);
     return false;
   }
-
 }
