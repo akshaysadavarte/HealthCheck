@@ -11,14 +11,14 @@ const MS_USER = process.env.MS_USERNAME;
 const MS_PWD = process.env.MS_PASSWORD;
 
 export const loginByAzureAD = async function (page, origin) {
-  await loadCookiesFromFile(page);
+  //await loadCookiesFromFile(page);
 
   await page.setDefaultNavigationTimeout(0);
   await page.goto(origin);
   await page.waitForSelector("button", { visible: true });
-  const azureADButton = await page.$("#AzureAD");
+  //const azureADButton = await page.$("#AzureAD");
 
-  if (!azureADButton) return;
+  //if (!azureADButton) return;
 
   await page.click("#AzureAD");
   await page.waitForNavigation();
@@ -35,7 +35,7 @@ export const loginByAzureAD = async function (page, origin) {
   await page.waitForNavigation();
   await page.click('[type="submit"]');
   await page.waitForNavigation();
-  await saveCookiesToFile(page);
+  //await saveCookiesToFile(page);
 };
 
 async function saveCookiesToFile(page) {
