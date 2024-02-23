@@ -9,7 +9,7 @@ export const puppeteerConfig = {
         '--disable-setuid-sandbox',
         "--no-zygote",],
         protocolTimeout: 240000,
-    headless: false,
+    headless: true,
     slowMo: 50,
 }
 export const lighthouseConfig = {

@@ -3,7 +3,6 @@ import main from '../index.js'
 
 app.timer('HealthCheck', {
     schedule: '0 */30 * * * *',
-    runOnStartup: true,
     handler: async (myTimer, context) => {
         context.log('Timer function processed request at', new Date().toISOString());
         context.log('Timer status:', myTimer);
