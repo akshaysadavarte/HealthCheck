@@ -51,6 +51,7 @@ async function saveCookiesToFile(page) {
     fs.writeFileSync(filePath, JSON.stringify(cookies, null, 2));
 
     // Cookies have been saved successfully
+    logger.log("Cookies have been saved successfully");
     return true;
   } catch (error) {
     // An error occurred while saving cookies
@@ -68,6 +69,7 @@ async function loadCookiesFromFile(page) {
     // Setting the cookies in the current page
     await page.setCookie(...cookies);
     // Cookies have been loaded successfully
+    logger.log(" Cookies have been loaded successfully!!!");
     return true;
   } catch (error) {
     // An error occurred while loading cookies
