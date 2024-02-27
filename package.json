@@ -12,11 +12,13 @@
   "license": "ISC",
   "dependencies": {
     "@azure/functions": "^4.0.0",
+    "axios": "^1.6.7",
     "is-url-http": "^2.3.7",
     "lighthouse": "^11.3.0",
     "mssql": "^10.0.1",
     "puppeteer": "^22.2.0",
     "sequelize": "^6.35.1",
+    "sleep-promise": "^9.1.0",
     "tedious": "^17.0.0"
   }
 }

@@ -53,7 +53,11 @@ export const screenResponseTimeModel = (sequelize, Sequelize) => {
         ModifiedBy: {
             type: Sequelize.STRING,
             allowNull: true
-        }
+        },
+        ScreenCategory: {
+            type: Sequelize.INTEGER,
+            allowNull: false
+        },
 
     },
         {

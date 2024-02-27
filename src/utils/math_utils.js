@@ -7,6 +7,11 @@ export const calculateAverageLoadTime = function (array) {
     return avgLoadTimeInSeconds;
 }
 
+export const getSmallDatetime = function (d) {
+    return `${d.getFullYear()}-${d.getUTCMonth() + 1}-${d.getDate()} ${d.getHours()}:${d.getMinutes()}:${d.getSeconds()}`;
+
+}
+
 const convertMillisecondsToSeconds = function (milliseconds) {
 
     if (milliseconds == 0 || isNaN(milliseconds)) { return 0 };
